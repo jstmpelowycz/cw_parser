@@ -8,7 +8,7 @@ from typing import Optional
 
 from src.modules.parser.bert_qa.bert_qa import BertQaModelClient
 from src.modules.parser.helpers import logging, normalize_text
-from src.modules.parser.regexs.constants import REG_FRAMEWORK_PATTERN
+from src.modules.parser.regexs.constants import REG_FRAMEWORK_PATTERN, CASE_FORM_MARKERS
 from src.modules.parser.typedefs import ParsedDocument, Commission, CaseSentencing, CasePartiesInfo, CaseParty, Sections
 
 from src.modules.parser.constants import DOCUMENT_PATH, PROCESSED_DOCUMENT_PATH, DOCUMENT_SENTENCES_PATH
@@ -41,7 +41,9 @@ class Parser:
 
   @logging('parsing case form...')
   def find_case_form(self) -> Optional[str]:
-    return
+    for case_form_id, case_form_pattern in enumerate(reh.make_case_form_patterns()):
+      if re.search(case_form_pattern, self.document):
+        return CASE_FORM_MARKERS[case_form_id]
 
   @logging('parsing commission...')
   def find_commission(self) -> Commission:
