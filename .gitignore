@@ -1,6 +1,7 @@
 # Custom dirs
 cache
 data
+src/modules/parser/__local__
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
