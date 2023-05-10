@@ -1,15 +1,19 @@
 import re
+from typing import Optional
+
 import src.modules.file_manager.file_manager as fm
 import src.modules.udpipe_client.udpipe_client as uc
 import src.modules.udpipe_client.helpers as uch
 import src.modules.parser.regexs.helpers as reh
 
-from typing import Optional
-
 from src.modules.parser.bert_qa.bert_qa import BertQaModelClient
 from src.modules.parser.helpers import logging, normalize_text
 from src.modules.parser.regexs.constants import REG_FRAMEWORK_PATTERN, CASE_FORM_MARKERS
-from src.modules.parser.typedefs import ParsedDocument, Commission, CaseSentencing, CasePartiesInfo, CaseParty, Sections
+from src.modules.parser.typedefs import \
+  ParsedDocument, \
+  CourtCommission, \
+  CaseSentencing, CasePartiesInfo, CaseParty, \
+  DocumentSections
 
 from src.modules.parser.constants import DOCUMENT_PATH, PROCESSED_DOCUMENT_PATH, DOCUMENT_SENTENCES_PATH
 
@@ -23,18 +27,18 @@ class Parser:
     self.__process_with_udp()
     self.__init_qa_model_client()
 
-  @logging('parsing document...')
   def parse(self) -> ParsedDocument:
     if not self.parsed_document:
       self.parsed_document = ParsedDocument(
         case_form=self.find_case_form(),
-        commission=self.find_commission(),
-        issue_date=self.find_document_issue_date(),
-        court_name=self.find_court_name(),
-        sentencing=self.find_case_sentencing(),
-        parties_info=self.find_parties_info(),
-        sections=self.find_document_sections(),
-        regulatory_framework=self.find_regulatory_framework(),
+        case_sentencing=self.find_case_sentencing(),
+        case_parties_info=self.find_case_parties_info(),
+        document_issue_date=self.find_document_issue_date(),
+        document_sections=self.find_document_sections(),
+        document_regulatory_framework=self.find_document_regulatory_framework(),
+        court_type=self.find_court_type(),
+        court_commission=self.find_court_commission(),
+        court_location=self.find_court_location(),
       )
 
     return self.parsed_document
@@ -45,21 +49,6 @@ class Parser:
       if re.search(case_form_pattern, self.document):
         return CASE_FORM_MARKERS[case_form_id]
 
-  @logging('parsing commission...')
-  def find_commission(self) -> Commission:
-    return Commission(
-      judge=self.find_judge(),
-      prosecutor=self.find_prosecutor(),
-      clerk=self.find_clerk(),
-    )
-
-  @logging('parsing parties info...')
-  def find_parties_info(self) -> CasePartiesInfo:
-    total = self.find_case_parties_total()
-    parties = self.find_case_parties(total)
-
-    return CasePartiesInfo(total, parties)
-
   @logging('parsing case sentencing...')
   def find_case_sentencing(self) -> CaseSentencing:
     return CaseSentencing(
@@ -67,19 +56,52 @@ class Parser:
       penalty_sum=self.find_case_sentencing_penalty_sum(),
     )
 
+  @logging('parsing parties info...')
+  def find_case_parties_info(self) -> CasePartiesInfo:
+    total = self.find_case_parties_total()
+    parties = self.find_case_parties(total)
+
+    return CasePartiesInfo(total, parties)
+
+  def find_document_issue_date(self) -> Optional[str]:
+    return self.qa_client.ask('Перша дата після іменем України?')
+
   @logging('parsing document sections...')
-  def find_document_sections(self) -> Sections:
-    return Sections(
+  def find_document_sections(self) -> DocumentSections:
+    return DocumentSections(
       ruling=self.find_case_ruling(),
       decision=self.find_case_decision(),
     )
 
   @logging('parsing regulatory framework...')
-  def find_regulatory_framework(self) -> list[str]:
+  def find_document_regulatory_framework(self) -> list[str]:
     matches_iter = re.finditer(REG_FRAMEWORK_PATTERN, self.document)
     framework = [match.group() for match in matches_iter]
 
     return framework
+
+  @logging('parsing court type...')
+  def find_court_type(self) -> Optional[str]:
+    return self.qa_client.ask('Який це тип суду?')
+
+  @logging('parsing court commission...')
+  def find_court_commission(self) -> CourtCommission:
+    return CourtCommission(
+      judge=self.find_court_judge(),
+      prosecutor=self.find_court_prosecutor(),
+      clerk=self.find_court_clerk(),
+    )
+
+  def find_court_location(self) -> Optional[str]:
+    return self.qa_client.ask('Де розташований суд?')
+
+  @logging('parsing case sentencing description...')
+  def find_case_sentencing_description(self) -> Optional[str]:
+    pass
+
+  @logging(message='parsing case sentencing penalty sum...')
+  def find_case_sentencing_penalty_sum(self) -> Optional[str]:
+    pass
 
   @logging('parsing case parties total...')
   def find_case_parties_total(self) -> int:
@@ -100,34 +122,14 @@ class Parser:
   def find_case_decision(self) -> Optional[str]:
     pass
 
-  @logging('parsing case sentencing description...')
-  def find_case_sentencing_description(self) -> Optional[str]:
-    pass
-
-  @logging(message='parsing case sentencing penalty sum...')
-  def find_case_sentencing_penalty_sum(self) -> Optional[str]:
-    pass
-
-  def find_court_type(self) -> Optional[str]:
-    return self.qa_client.ask('Який це тип суду?')
-
-  def find_document_issue_date(self) -> Optional[str]:
-    return self.qa_client.ask('Перша дата після іменем України?')
-
-  def find_document_articles(self) -> Optional[str]:
-    return self.qa_client.ask('Які правові норми згадані в тексті?')
-
-  def find_judge(self) -> Optional[str]:
+  def find_court_judge(self) -> Optional[str]:
     return reh.if_fullname(self.qa_client.ask('ПІБ головуючого судді?'))
 
-  def find_prosecutor(self) -> Optional[str]:
+  def find_court_prosecutor(self) -> Optional[str]:
     return reh.if_fullname(self.qa_client.ask('ПІБ прокурора?'))
 
-  def find_clerk(self) -> Optional[str]:
+  def find_court_clerk(self) -> Optional[str]:
     return reh.if_fullname(self.qa_client.ask('ПІБ секретаря?'))
-
-  def find_court_name(self) -> Optional[str]:
-    return self.qa_client.ask('Де розташований суд?')
 
   @logging('initializing QA model client...')
   def __init_qa_model_client(self) -> None:

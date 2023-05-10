@@ -4,7 +4,7 @@ from typing import Optional
 
 
 @dataclass
-class Commission:
+class CourtCommission:
   judge: Optional[str]
   prosecutor: Optional[str]
   clerk: Optional[str]
@@ -34,7 +34,7 @@ class CasePartiesInfo:
 
 
 @dataclass
-class Sections:
+class DocumentSections:
   ruling: Optional[str]
   decision: Optional[str]
 
@@ -42,10 +42,13 @@ class Sections:
 @dataclass
 class ParsedDocument:
   case_form: Optional[str]
-  commission: Commission
-  issue_date: Optional[str]
-  sentencing: CaseSentencing
-  court_name: Optional[str]
-  parties_info: CasePartiesInfo
-  sections: Sections
-  regulatory_framework: list[str]
+  case_sentencing: CaseSentencing
+  case_parties_info: CasePartiesInfo
+
+  document_issue_date: Optional[str]
+  document_sections: DocumentSections
+  document_regulatory_framework: list[str]
+
+  court_type: Optional[str]
+  court_commission: CourtCommission
+  court_location: Optional[str]
