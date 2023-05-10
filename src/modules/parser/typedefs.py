@@ -24,7 +24,7 @@ class Sex(Enum):
 @dataclass
 class CaseParty:
   name: Optional[str]
-  sex: Sex
+  sex: Optional[Sex]
 
 
 @dataclass
