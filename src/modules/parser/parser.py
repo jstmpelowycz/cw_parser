@@ -8,11 +8,11 @@ import src.modules.parser.regexs.helpers as reh
 
 from src.modules.parser.bert_qa.bert_qa import BertQaModelClient
 from src.modules.parser.helpers import logging, normalize_text
-from src.modules.parser.regexs.constants import REG_FRAMEWORK_PATTERN, CASE_FORM_MARKERS
+from src.modules.parser.regexs.constants import REG_FRAMEWORK_PATTERN, CASE_FORM_MARKERS, UDP_GENDER_PATTERN
 from src.modules.parser.typedefs import \
   ParsedDocument, \
   CourtCommission, \
-  CaseSentencing, CasePartiesInfo, CaseParty, \
+  CaseSentencing, CasePartiesInfo, CaseParty, Sex, \
   DocumentSections
 
 from src.modules.parser.constants import DOCUMENT_PATH, PROCESSED_DOCUMENT_PATH, DOCUMENT_SENTENCES_PATH
@@ -112,7 +112,52 @@ class Parser:
 
   @logging('parsing case parties...')
   def find_case_parties(self, count: int) -> list[CaseParty]:
-    pass
+    case_parties: list[CaseParty] = []
+
+    case_parties_with_assumed_genders = self.__assume_case_parties_genders(count)
+
+    for party_name, assumed_genders in case_parties_with_assumed_genders.items():
+      sex = Parser.__defined_major_sex(assumed_genders)
+
+      case_parties.append(CaseParty(name=party_name, sex=sex))
+
+    return case_parties
+
+  def __assume_case_parties_genders(self, count: int) -> dict[str, list[str]]:
+    case_parties_with_assumed_genders = dict()
+
+    for party_id in range(1, count + 1):
+      party_name_to_find = f'ОСОБА_{party_id}'
+      assumed_genders = []
+
+      for sentence in self.sentences:
+        if party_name_to_find in sentence.sentence:
+          for member in sentence.data:
+            if member.word == party_name_to_find:
+              assumed_gender_match = re.search(UDP_GENDER_PATTERN, member.features)
+
+              if assumed_gender_match:
+                assumed_gender = assumed_gender_match.group()
+
+                assumed_genders.append(assumed_gender)
+
+      case_parties_with_assumed_genders[party_name_to_find] = assumed_genders
+
+    return case_parties_with_assumed_genders
+
+  @staticmethod
+  def __defined_major_sex(assumed_genders: list[str]) -> Sex:
+    masc_count = assumed_genders.count(str(Sex.M.value))
+    fem_count = assumed_genders.count(str(Sex.F.value))
+
+    if masc_count > fem_count:
+      sex = Sex.M
+    elif masc_count < fem_count:
+      sex = Sex.F
+    else:
+      sex = None
+
+    return sex
 
   @logging('parsing case ruling...')
   def find_case_ruling(self):
@@ -150,8 +195,12 @@ class Parser:
 
     processed_document = fm.read_json(path=PROCESSED_DOCUMENT_PATH)
     raw_udp_result = uch.get_udp_result(processed_document)
-    sentences = uc.make_sentences_from_udp_result(raw_udp_result)
 
-    sentences_dict = [uch.sentence_to_dict(sentence) for sentence in sentences]
+    self.sentences = uc.make_sentences_from_udp_result(raw_udp_result)
+
+    sentences_dict = [
+      uch.sentence_to_dict(sentence)
+      for sentence in self.sentences
+    ]
 
     fm.write_to_json(path=DOCUMENT_SENTENCES_PATH, data=sentences_dict)
