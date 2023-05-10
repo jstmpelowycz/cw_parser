@@ -23,7 +23,7 @@ class BertQaModelClient:
     if not answer:
       return None
 
-    return normalize_answer(answer) if answer else None
+    return normalize_answer(answer)
 
   def reset_context(self, context: str) -> None:
     self.context = context
