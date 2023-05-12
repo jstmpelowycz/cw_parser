@@ -11,6 +11,18 @@ CASE_FORM_MARKERS = [
   'додаткове рішення',
 ]
 
+CASE_RULING_START_MARKERS = [
+  'встанови',
+  'постанови',
+]
+
+CASE_DECISION_START_MARKERS = [
+  'виріши',
+  'ухвали',
+]
+
+CASE_DECISION_END_MARKER = 'суддя'
+
 FULLNAME_REGEX = r'^[А-ЩЬЮЯІЇЄҐ][а-щьюяіїєґ\'’]+\s?[А-ЩЬЮЯІЇЄҐ]\.\s?[А-ЩЬЮЯІЇЄҐ]\.$'
 FULLNAME_PATTERN = re.compile(FULLNAME_REGEX)
 
