@@ -7,6 +7,7 @@ import src.modules.udpipe_client.helpers as uch
 import src.modules.parser.regexs.helpers as reh
 
 from src.modules.parser.bert_qa.bert_qa import BertQaModelClient
+from src.modules.parser.decorators import WithSectionContext
 from src.modules.parser.helpers import logging, normalize_text
 
 from src.modules.parser.regexs.constants import \
@@ -18,7 +19,7 @@ from src.modules.parser.typedefs import \
   ParsedDocument, \
   CourtCommission, \
   CaseSentencing, CasePartiesInfo, CaseParty, Sex, \
-  DocumentSections
+  DocumentSections, DocumentSectionType
 
 from src.modules.parser.constants import DOCUMENT_PATH, PROCESSED_DOCUMENT_PATH, DOCUMENT_SENTENCES_PATH
 
@@ -62,6 +63,7 @@ class Parser:
     return self.document_sections
 
   @logging('parsing document issue date...')
+  @WithSectionContext(section_type=DocumentSectionType.Header)
   def find_document_issue_date(self) -> Optional[str]:
     return self.qa_client.ask('Перша дата після іменем України?')
 
@@ -73,6 +75,7 @@ class Parser:
     return framework
 
   @logging('parsing case form...')
+  @WithSectionContext(section_type=DocumentSectionType.Header)
   def find_case_form(self) -> Optional[str]:
     for case_form_id, case_form_pattern in enumerate(reh.make_case_form_patterns()):
       if self.__search(case_form_pattern):
@@ -97,6 +100,7 @@ class Parser:
     pass
 
   @logging('parsing court commission...')
+  @WithSectionContext(section_type=DocumentSectionType.Header)
   def find_court_commission(self) -> CourtCommission:
     return CourtCommission(
       judge=self.find_court_judge(),
@@ -105,6 +109,7 @@ class Parser:
     )
 
   @logging('parsing court location...')
+  @WithSectionContext(section_type=DocumentSectionType.Header)
   def find_court_location(self) -> Optional[str]:
     return self.qa_client.ask('Де розташований суд?')
 
@@ -186,6 +191,15 @@ class Parser:
   def find_court_clerk(self) -> Optional[str]:
     return reh.only_if_fullname(self.qa_client.ask('ПІБ секретаря?'))
 
+  def get_section(self, section_type: DocumentSectionType) -> Optional[str]:
+    if section_type == DocumentSectionType.Header:
+      return self.document_sections.header
+
+    if section_type == DocumentSectionType.Ruling:
+      return self.document_sections.ruling
+
+    return self.document_sections.decision
+
   def __find_by_pattern(self, pattern: Pattern[str]) -> Optional[str]:
     match = self.__search(pattern)
 
@@ -205,10 +219,6 @@ class Parser:
   def __search(self, pattern: Pattern) -> Match:
     return re.search(pattern, self.document)
 
-  @logging('initializing QA model client...')
-  def __init_qa_model_client(self) -> None:
-    self.qa_client = BertQaModelClient(context=self.document)
-
   @logging('committing document...')
   def __commit_document(self) -> None:
     raw_document_content = fm.read_pdf(self.path)
@@ -217,6 +227,10 @@ class Parser:
     fm.write_to_file(path=DOCUMENT_PATH, content=normalized_document_content)
 
     self.document = normalized_document_content
+
+  @logging('initializing QA model client...')
+  def __init_qa_model_client(self) -> None:
+    self.qa_client = BertQaModelClient(context=self.document)
 
   @logging('processing with UDPipe, mapping to sentences...')
   def __process_with_udp(self) -> None:  # noqa
