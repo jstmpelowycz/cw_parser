@@ -35,6 +35,7 @@ class CasePartiesInfo:
 
 @dataclass
 class DocumentSections:
+  header: Optional[str]
   ruling: Optional[str]
   decision: Optional[str]
 
