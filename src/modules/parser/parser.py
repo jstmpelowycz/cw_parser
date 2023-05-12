@@ -1,5 +1,5 @@
 import re
-from typing import Optional
+from typing import Optional, Pattern, Match
 
 import src.modules.file_manager.file_manager as fm
 import src.modules.udpipe_client.udpipe_client as uc
@@ -8,7 +8,12 @@ import src.modules.parser.regexs.helpers as reh
 
 from src.modules.parser.bert_qa.bert_qa import BertQaModelClient
 from src.modules.parser.helpers import logging, normalize_text
-from src.modules.parser.regexs.constants import REG_FRAMEWORK_PATTERN, CASE_FORM_MARKERS, UDP_GENDER_PATTERN
+
+from src.modules.parser.regexs.constants import \
+  REG_FRAMEWORK_PATTERN, \
+  CASE_FORM_MARKERS, \
+  UDP_GENDER_PATTERN
+
 from src.modules.parser.typedefs import \
   ParsedDocument, \
   CourtCommission, \
@@ -21,7 +26,9 @@ from src.modules.parser.constants import DOCUMENT_PATH, PROCESSED_DOCUMENT_PATH,
 class Parser:
   def __init__(self, path: str) -> None:
     self.path = path
+
     self.parsed_document: Optional[ParsedDocument] = None
+    self.document_sections: Optional[DocumentSections] = None
 
     self.__commit_document()
     self.__process_with_udp()
@@ -30,12 +37,12 @@ class Parser:
   def parse(self) -> ParsedDocument:
     if not self.parsed_document:
       self.parsed_document = ParsedDocument(
+        document_sections=self.find_document_sections(),
+        document_issue_date=self.find_document_issue_date(),
+        document_regulatory_framework=self.find_document_regulatory_framework(),
         case_form=self.find_case_form(),
         case_sentencing=self.find_case_sentencing(),
         case_parties_info=self.find_case_parties_info(),
-        document_issue_date=self.find_document_issue_date(),
-        document_sections=self.find_document_sections(),
-        document_regulatory_framework=self.find_document_regulatory_framework(),
         court_type=self.find_court_type(),
         court_commission=self.find_court_commission(),
         court_location=self.find_court_location(),
@@ -43,10 +50,32 @@ class Parser:
 
     return self.parsed_document
 
+  @logging('parsing document sections...')
+  def find_document_sections(self) -> DocumentSections:
+    if not self.document_sections:
+      self.document_sections = DocumentSections(
+        header=self.find_case_header(),
+        ruling=self.find_case_ruling(),
+        decision=self.find_case_decision(),
+      )
+
+    return self.document_sections
+
+  @logging('parsing document issue date...')
+  def find_document_issue_date(self) -> Optional[str]:
+    return self.qa_client.ask('Перша дата після іменем України?')
+
+  @logging('parsing regulatory framework...')
+  def find_document_regulatory_framework(self) -> list[str]:
+    matches_iter = re.finditer(REG_FRAMEWORK_PATTERN, self.document)
+    framework = [match.group() for match in matches_iter]
+
+    return framework
+
   @logging('parsing case form...')
   def find_case_form(self) -> Optional[str]:
     for case_form_id, case_form_pattern in enumerate(reh.make_case_form_patterns()):
-      if re.search(case_form_pattern, self.document):
+      if self.__search(case_form_pattern):
         return CASE_FORM_MARKERS[case_form_id]
 
   @logging('parsing case sentencing...')
@@ -63,26 +92,9 @@ class Parser:
 
     return CasePartiesInfo(total, parties)
 
-  def find_document_issue_date(self) -> Optional[str]:
-    return self.qa_client.ask('Перша дата після іменем України?')
-
-  @logging('parsing document sections...')
-  def find_document_sections(self) -> DocumentSections:
-    return DocumentSections(
-      ruling=self.find_case_ruling(),
-      decision=self.find_case_decision(),
-    )
-
-  @logging('parsing regulatory framework...')
-  def find_document_regulatory_framework(self) -> list[str]:
-    matches_iter = re.finditer(REG_FRAMEWORK_PATTERN, self.document)
-    framework = [match.group() for match in matches_iter]
-
-    return framework
-
   @logging('parsing court type...')
   def find_court_type(self) -> Optional[str]:
-    return self.qa_client.ask('Який це тип суду?')
+    pass
 
   @logging('parsing court commission...')
   def find_court_commission(self) -> CourtCommission:
@@ -92,25 +104,22 @@ class Parser:
       clerk=self.find_court_clerk(),
     )
 
+  @logging('parsing court location...')
   def find_court_location(self) -> Optional[str]:
     return self.qa_client.ask('Де розташований суд?')
 
-  @logging('parsing case sentencing description...')
   def find_case_sentencing_description(self) -> Optional[str]:
     pass
 
-  @logging(message='parsing case sentencing penalty sum...')
   def find_case_sentencing_penalty_sum(self) -> Optional[str]:
     pass
 
-  @logging('parsing case parties total...')
   def find_case_parties_total(self) -> int:
     matches = re.findall(r'ОСОБА_\d+', self.document)
     count = len(set(matches))
 
     return count
 
-  @logging('parsing case parties...')
   def find_case_parties(self, count: int) -> list[CaseParty]:
     case_parties: list[CaseParty] = []
 
@@ -159,22 +168,42 @@ class Parser:
 
     return sex
 
-  @logging('parsing case ruling...')
-  def find_case_ruling(self):
-    pass
+  def find_case_ruling(self) -> Optional[str]:
+    return self.__find_by_pattern(reh.make_case_ruling_pattern())
 
-  @logging('parsing case decision...')
   def find_case_decision(self) -> Optional[str]:
-    pass
+    return self.__find_by_pattern(reh.make_case_decision_pattern())
+
+  def find_case_header(self) -> Optional[str]:
+    return self.__find_by_pattern(reh.make_case_header_pattern())
 
   def find_court_judge(self) -> Optional[str]:
-    return reh.if_fullname(self.qa_client.ask('ПІБ головуючого судді?'))
+    return reh.only_if_fullname(self.qa_client.ask('ПІБ головуючого судді?'))
 
   def find_court_prosecutor(self) -> Optional[str]:
-    return reh.if_fullname(self.qa_client.ask('ПІБ прокурора?'))
+    return reh.only_if_fullname(self.qa_client.ask('ПІБ прокурора?'))
 
   def find_court_clerk(self) -> Optional[str]:
-    return reh.if_fullname(self.qa_client.ask('ПІБ секретаря?'))
+    return reh.only_if_fullname(self.qa_client.ask('ПІБ секретаря?'))
+
+  def __find_by_pattern(self, pattern: Pattern[str]) -> Optional[str]:
+    match = self.__search(pattern)
+
+    if not match:
+      return None
+
+    desc_sorted_groups = sorted(
+      match.groups(),
+      key=lambda group: len(group) if group else 0,
+      reverse=True,
+    )
+
+    desired_group = desc_sorted_groups[0]
+
+    return desired_group.strip()
+
+  def __search(self, pattern: Pattern) -> Match:
+    return re.search(pattern, self.document)
 
   @logging('initializing QA model client...')
   def __init_qa_model_client(self) -> None:
