@@ -21,6 +21,12 @@ class Sex(Enum):
   F = 'Fem'
 
 
+class DocumentSectionType(Enum):
+  Header = 1
+  Ruling = 2
+  Decision = 3
+
+
 @dataclass
 class CaseParty:
   name: Optional[str]
