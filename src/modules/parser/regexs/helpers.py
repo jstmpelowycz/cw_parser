@@ -3,7 +3,7 @@ from re import Pattern
 from typing import Optional
 
 from src.modules.parser.regexs.constants import \
-  FULLNAME_REGEX, \
+  FULLNAME_PATTERN, \
   CASE_RULING_START_MARKERS, \
   CASE_DECISION_START_MARKERS, \
   CASE_DECISION_END_MARKER, \
@@ -38,7 +38,7 @@ def make_case_header_regex() -> str:
   return (
       r'^(.*?)'
       + end_regex
-      + r'\s*:?'
+      + r'\s*:'
   )
 
 
@@ -56,9 +56,9 @@ def make_case_ruling_regex() -> str:
   return (
       r'('
       + start_regex
-      + r')\s*:?(.*?)'
+      + r')\s*:(.*?)('
       + end_regex
-      + r'\s*:?'
+      + r')\s*:'
   )
 
 
@@ -71,9 +71,9 @@ def make_case_decision_regex() -> str:
   return (
       r'('
       + r'|'.join(regex_elements)
-      + r')\s*:?(.*?)'
+      + r')\s*:(.*?)'
       + '\s*'.join([char for char in CASE_DECISION_END_MARKER])
-      + r'\s*:?'
+      + r'\s*:'
   )
 
 
@@ -88,7 +88,7 @@ def make_case_form_regex(lowercase_word: str) -> str:
 def is_fullname(attempt_input: Optional[str]) -> bool:
   if not attempt_input:
     return False
-  return bool(re.match(FULLNAME_REGEX, attempt_input))
+  return bool(re.match(FULLNAME_PATTERN, attempt_input))
 
 
 def only_if_fullname(attempt_input: str) -> Optional[str]:
