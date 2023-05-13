@@ -1,6 +1,11 @@
 from src.utils.decorators import make_logging_decorator
 
-from src.modules.parser.regexs.constants import NBSP_PATTERN, FF_PATTERN, HTTP_PATTERN, NON_24_DATE_PATTERN
+from src.modules.parser.regexs.constants import \
+  NBSP_PATTERN, \
+  FF_PATTERN, \
+  HTTP_PATTERN, \
+  NON_24_DATE_PATTERN, \
+  UTF_START_BYTE_PATTERN
 
 
 def normalize_text(text: str) -> str:
@@ -15,6 +20,7 @@ def normalize_text(text: str) -> str:
 
 def purify_text(text: str) -> str:
   modified_text = NBSP_PATTERN.sub(" ", text)
+  modified_text = UTF_START_BYTE_PATTERN.sub(" ", modified_text)
   modified_text = FF_PATTERN.sub("", modified_text)
   modified_text = HTTP_PATTERN.sub("", modified_text)
   modified_text = NON_24_DATE_PATTERN.sub("", modified_text)
