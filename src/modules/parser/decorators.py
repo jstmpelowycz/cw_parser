@@ -18,11 +18,13 @@ class WithSectionContext:
       self.section_context = self.instance.get_section(section_type=self.section_type)
 
       if self.section_context:
-        self.instance.qa_client.reset_context(context=self.section_context)
+        self.instance.temp_context = self.section_context
+        self.instance.qa_client.reset_context(context=self.instance.temp_context)
 
       return func(self.instance, *args, **kwargs)
 
     if self.section_context:
+      self.instance.temp_context = None
       self.instance.qa_client.reset_context(context=self.document_context)
 
     return wrapped_func
