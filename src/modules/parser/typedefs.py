@@ -1,6 +1,14 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Pattern
+
+FindOption = Pattern or str
+
+
+class DocumentSectionType(Enum):
+  Header = 1
+  Ruling = 2
+  Decision = 3
 
 
 @dataclass
@@ -11,26 +19,9 @@ class CourtCommission:
 
 
 @dataclass
-class CaseSentencing:
-  description: Optional[str]
-  penalty_sum: Optional[str]
-
-
-class Sex(Enum):
-  M = 'Masc'
-  F = 'Fem'
-
-
-class DocumentSectionType(Enum):
-  Header = 1
-  Ruling = 2
-  Decision = 3
-
-
-@dataclass
 class CaseParty:
   name: Optional[str]
-  sex: Optional[Sex]
+  sex: Optional[str]
 
 
 @dataclass
@@ -48,14 +39,14 @@ class DocumentSections:
 
 @dataclass
 class ParsedDocument:
-  case_form: Optional[str]
-  case_sentencing: CaseSentencing
-  case_parties_info: CasePartiesInfo
-
-  document_issue_date: Optional[str]
   document_sections: DocumentSections
+  document_issue_date: Optional[str]
   document_regulatory_framework: list[str]
 
-  court_type: Optional[str]
+  case_form: Optional[str]
+  case_parties_info: CasePartiesInfo
+
   court_commission: CourtCommission
   court_location: Optional[str]
+
+  document_decision_status: Optional[str]
