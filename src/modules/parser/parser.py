@@ -15,7 +15,8 @@ from src.modules.parser.regexs.constants import \
   REG_FRAMEWORK_PATTERN, \
   CASE_FORM_MARKERS, \
   UDP_GENDER_PATTERN, \
-  DECISION_STATUS_PATTERN
+  DECISION_STATUS_PATTERN, \
+  JUDGE_PATTERN, PROSECUTOR_PATTERN, CLERK_PATTERN
 
 from src.modules.parser.typedefs import \
   ParsedDocument, \
@@ -26,7 +27,6 @@ from src.modules.parser.typedefs import \
 from src.modules.parser.constants import \
   DOCUMENT_PATH, \
   PROCESSED_DOCUMENT_PATH, \
-  DEF_PARSED_DOCUMENT_PATH, \
   DOCUMENT_SENTENCES_PATH, \
   NO_OCCUR_IN_TEXT, \
   CASE_DECISION_STATUS, \
@@ -34,22 +34,24 @@ from src.modules.parser.constants import \
 
 
 class Parser:
-  def __init__(self, src_path: str, dst_path=DEF_PARSED_DOCUMENT_PATH) -> None:
-    self.src_path = src_path
-    self.dst_path = dst_path
-
+  def __init__(self) -> None:
+    self.document = ''
+    self.src_path: Optional[str] = None
+    self.dst_path: Optional[str] = None
     self.temp_context: Optional[str] = None
-
     self.document_sections: Optional[DocumentSections] = None
     self.parsed_document: Optional[ParsedDocument] = None
 
-  def __call__(self, with_udp=True):
-    self.__commit_document()
-
-    if with_udp:
-      self.__process_with_udp()
-
     self.__init_qa_model_client()
+
+  def __call__(self, src_path: str, dst_path: str) -> None:
+    self.src_path = src_path
+    self.dst_path = dst_path
+
+    self.__commit_document()
+    self.qa_client.reset_context(context=self.document)
+
+    self.__process_with_udp()
     self.__parse()
     self.__commit_parsed_document()
 
@@ -67,12 +69,11 @@ class Parser:
 
   @logging('parsing document sections...')
   def find_document_sections(self) -> DocumentSections:
-    if not self.document_sections:
-      self.document_sections = DocumentSections(
-        header=self.find_case_header(),
-        ruling=self.find_case_ruling(),
-        decision=self.find_case_decision(),
-      )
+    self.document_sections = DocumentSections(
+      header=self.find_case_header(),
+      ruling=self.find_case_ruling(),
+      decision=self.find_case_decision(),
+    )
 
     return self.document_sections
 
@@ -198,19 +199,19 @@ class Parser:
 
   def find_court_judge(self) -> Optional[str]:
     return self.__only_if_occur_in_section(
-      find_option='судд',
+      find_option=JUDGE_PATTERN,
       result=reh.only_if_fullname(self.qa_client.ask('ПІБ головуючого судді?'))
     )
 
   def find_court_prosecutor(self) -> Optional[str]:
     return self.__only_if_occur_in_section(
-      find_option='прокурор',
+      find_option=PROSECUTOR_PATTERN,
       result=reh.only_if_fullname(self.qa_client.ask('ПІБ прокурора?'))
     )
 
   def find_court_clerk(self) -> Optional[str]:
     return self.__only_if_occur_in_section(
-      find_option='секретар',
+      find_option=CLERK_PATTERN,
       result=reh.only_if_fullname(self.qa_client.ask('ПІБ секретаря?'))
     )
 
