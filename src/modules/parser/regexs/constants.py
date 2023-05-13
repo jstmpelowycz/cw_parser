@@ -26,7 +26,10 @@ CASE_DECISION_END_MARKER = 'суддя'
 FULLNAME_PATTERN = re.compile(r'^[А-ЩЬЮЯІЇЄҐ][а-щьюяіїєґ\'’]+\s?[А-ЩЬЮЯІЇЄҐ]\.\s?[А-ЩЬЮЯІЇЄҐ]\.$')
 REG_FRAMEWORK_PATTERN = re.compile(r'(пункт|частина|стаття).*України', re.MULTILINE | re.IGNORECASE)
 UDP_GENDER_PATTERN = re.compile(r'(Neut|Masc|Fem)')
-DECISION_STATUS_PATTERN = re.compile(r'(задовольнити|відмовити)')
+DECISION_STATUS_PATTERN = re.compile(r'(задовольнити|відмовити)', re.IGNORECASE)
+PROSECUTOR_PATTERN = re.compile(r'прокурор', re.IGNORECASE)
+CLERK_PATTERN = re.compile(r'секретар', re.IGNORECASE)
+JUDGE_PATTERN = re.compile(r'судд', re.IGNORECASE)
 
 NBSP_PATTERN = re.compile(r'\xA0')
 UTF_START_BYTE_PATTERN = re.compile(r'\xd0')

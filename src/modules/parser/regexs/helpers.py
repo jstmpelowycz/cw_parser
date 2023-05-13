@@ -73,7 +73,7 @@ def make_case_decision_regex() -> str:
       + r'|'.join(regex_elements)
       + r')\s*:(.*?)'
       + '\s*'.join([char for char in CASE_DECISION_END_MARKER])
-      + r'\s*:'
+      + r'\s*:?'
   )
 
 
