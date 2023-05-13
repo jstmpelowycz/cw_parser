@@ -1,4 +1,5 @@
 import re
+from dataclasses import asdict
 from typing import Optional, Pattern, Match
 
 import src.modules.file_manager.file_manager as fm
@@ -13,43 +14,56 @@ from src.modules.parser.helpers import logging, normalize_text
 from src.modules.parser.regexs.constants import \
   REG_FRAMEWORK_PATTERN, \
   CASE_FORM_MARKERS, \
-  UDP_GENDER_PATTERN
+  UDP_GENDER_PATTERN, \
+  DECISION_STATUS_PATTERN
 
 from src.modules.parser.typedefs import \
   ParsedDocument, \
   CourtCommission, \
-  CaseSentencing, CasePartiesInfo, CaseParty, Sex, \
-  DocumentSections, DocumentSectionType
+  CasePartiesInfo, CaseParty, \
+  DocumentSections, DocumentSectionType, FindOption
 
-from src.modules.parser.constants import DOCUMENT_PATH, PROCESSED_DOCUMENT_PATH, DOCUMENT_SENTENCES_PATH
+from src.modules.parser.constants import \
+  DOCUMENT_PATH, \
+  PROCESSED_DOCUMENT_PATH, \
+  DEF_PARSED_DOCUMENT_PATH, \
+  DOCUMENT_SENTENCES_PATH, \
+  NO_OCCUR_IN_TEXT, \
+  CASE_DECISION_STATUS, \
+  SEX
 
 
 class Parser:
-  def __init__(self, path: str) -> None:
-    self.path = path
+  def __init__(self, src_path: str, dst_path=DEF_PARSED_DOCUMENT_PATH) -> None:
+    self.src_path = src_path
+    self.dst_path = dst_path
 
-    self.parsed_document: Optional[ParsedDocument] = None
+    self.temp_context: Optional[str] = None
+
     self.document_sections: Optional[DocumentSections] = None
+    self.parsed_document: Optional[ParsedDocument] = None
 
+  def __call__(self, with_udp=True):
     self.__commit_document()
-    self.__process_with_udp()
+
+    if with_udp:
+      self.__process_with_udp()
+
     self.__init_qa_model_client()
+    self.__parse()
+    self.__commit_parsed_document()
 
-  def parse(self) -> ParsedDocument:
-    if not self.parsed_document:
-      self.parsed_document = ParsedDocument(
-        document_sections=self.find_document_sections(),
-        document_issue_date=self.find_document_issue_date(),
-        document_regulatory_framework=self.find_document_regulatory_framework(),
-        case_form=self.find_case_form(),
-        case_sentencing=self.find_case_sentencing(),
-        case_parties_info=self.find_case_parties_info(),
-        court_type=self.find_court_type(),
-        court_commission=self.find_court_commission(),
-        court_location=self.find_court_location(),
-      )
-
-    return self.parsed_document
+  def __parse(self) -> None:
+    self.parsed_document = ParsedDocument(
+      document_sections=self.find_document_sections(),
+      document_issue_date=self.find_document_issue_date(),
+      document_regulatory_framework=self.find_document_regulatory_framework(),
+      document_decision_status=self.find_document_decision_status(),
+      case_form=self.find_case_form(),
+      case_parties_info=self.find_case_parties_info(),
+      court_commission=self.find_court_commission(),
+      court_location=self.find_court_location(),
+    )
 
   @logging('parsing document sections...')
   def find_document_sections(self) -> DocumentSections:
@@ -74,19 +88,20 @@ class Parser:
 
     return framework
 
+  @logging('parsing document decision status...')
+  @WithSectionContext(section_type=DocumentSectionType.Decision)
+  def find_document_decision_status(self) -> Optional[str]:
+    return self.__only_if_occur_in_section(
+      find_option=DECISION_STATUS_PATTERN,
+      result=self.__define_case_decision_status(),
+    )
+
   @logging('parsing case form...')
   @WithSectionContext(section_type=DocumentSectionType.Header)
   def find_case_form(self) -> Optional[str]:
     for case_form_id, case_form_pattern in enumerate(reh.make_case_form_patterns()):
-      if self.__search(case_form_pattern):
+      if self.__search_in_document(case_form_pattern):
         return CASE_FORM_MARKERS[case_form_id]
-
-  @logging('parsing case sentencing...')
-  def find_case_sentencing(self) -> CaseSentencing:
-    return CaseSentencing(
-      description=self.find_case_sentencing_description(),
-      penalty_sum=self.find_case_sentencing_penalty_sum(),
-    )
 
   @logging('parsing parties info...')
   def find_case_parties_info(self) -> CasePartiesInfo:
@@ -94,10 +109,6 @@ class Parser:
     parties = self.find_case_parties(total)
 
     return CasePartiesInfo(total, parties)
-
-  @logging('parsing court type...')
-  def find_court_type(self) -> Optional[str]:
-    pass
 
   @logging('parsing court commission...')
   @WithSectionContext(section_type=DocumentSectionType.Header)
@@ -112,12 +123,6 @@ class Parser:
   @WithSectionContext(section_type=DocumentSectionType.Header)
   def find_court_location(self) -> Optional[str]:
     return self.qa_client.ask('Де розташований суд?')
-
-  def find_case_sentencing_description(self) -> Optional[str]:
-    pass
-
-  def find_case_sentencing_penalty_sum(self) -> Optional[str]:
-    pass
 
   def find_case_parties_total(self) -> int:
     matches = re.findall(r'ОСОБА_\d+', self.document)
@@ -160,14 +165,14 @@ class Parser:
     return case_parties_with_assumed_genders
 
   @staticmethod
-  def __defined_major_sex(assumed_genders: list[str]) -> Sex:
-    masc_count = assumed_genders.count(str(Sex.M.value))
-    fem_count = assumed_genders.count(str(Sex.F.value))
+  def __defined_major_sex(assumed_genders: list[str]) -> Optional[str]:
+    masc_count = assumed_genders.count(SEX['M'])
+    fem_count = assumed_genders.count(SEX['F'])
 
     if masc_count > fem_count:
-      sex = Sex.M
+      sex = SEX['M']
     elif masc_count < fem_count:
-      sex = Sex.F
+      sex = SEX['F']
     else:
       sex = None
 
@@ -182,14 +187,32 @@ class Parser:
   def find_case_header(self) -> Optional[str]:
     return self.__find_by_pattern(reh.make_case_header_pattern())
 
+  def __define_case_decision_status(self) -> Optional[str]:
+    if CASE_DECISION_STATUS['SATISFIED'] in self.temp_context:
+      return CASE_DECISION_STATUS['SATISFIED']
+
+    if CASE_DECISION_STATUS['REJECTED'] in self.temp_context:
+      return CASE_DECISION_STATUS['REJECTED']
+
+    return None
+
   def find_court_judge(self) -> Optional[str]:
-    return reh.only_if_fullname(self.qa_client.ask('ПІБ головуючого судді?'))
+    return self.__only_if_occur_in_section(
+      find_option='судд',
+      result=reh.only_if_fullname(self.qa_client.ask('ПІБ головуючого судді?'))
+    )
 
   def find_court_prosecutor(self) -> Optional[str]:
-    return reh.only_if_fullname(self.qa_client.ask('ПІБ прокурора?'))
+    return self.__only_if_occur_in_section(
+      find_option='прокурор',
+      result=reh.only_if_fullname(self.qa_client.ask('ПІБ прокурора?'))
+    )
 
   def find_court_clerk(self) -> Optional[str]:
-    return reh.only_if_fullname(self.qa_client.ask('ПІБ секретаря?'))
+    return self.__only_if_occur_in_section(
+      find_option='секретар',
+      result=reh.only_if_fullname(self.qa_client.ask('ПІБ секретаря?'))
+    )
 
   def get_section(self, section_type: DocumentSectionType) -> Optional[str]:
     if section_type == DocumentSectionType.Header:
@@ -200,8 +223,26 @@ class Parser:
 
     return self.document_sections.decision
 
+  def __only_if_occur_in_section(
+      self,
+      find_option: FindOption,
+      result: Optional[str],
+  ) -> Optional[str]:
+    assert self.temp_context
+
+    if not self.__has_occurrence(find_option):
+      return NO_OCCUR_IN_TEXT
+
+    return result
+
+  def __has_occurrence(self, find_option: FindOption) -> bool:
+    if isinstance(find_option, Pattern):
+      return bool(self.__search_in_temp_context(find_option))
+
+    return find_option in self.temp_context
+
   def __find_by_pattern(self, pattern: Pattern[str]) -> Optional[str]:
-    match = self.__search(pattern)
+    match = self.__search_in_document(pattern)
 
     if not match:
       return None
@@ -216,12 +257,26 @@ class Parser:
 
     return desired_group.strip()
 
-  def __search(self, pattern: Pattern) -> Match:
+  def __search_in_document(self, pattern: Pattern) -> Match:
     return re.search(pattern, self.document)
+
+  def __search_in_temp_context(self, pattern: Pattern) -> Match:
+    assert self.temp_context
+
+    return re.search(pattern, self.temp_context)
+
+  @logging('committing parsed document...')
+  def __commit_parsed_document(self):
+    assert self.parsed_document
+
+    fm.write_to_json(
+      path=self.dst_path,
+      data=asdict(self.parsed_document),
+    )
 
   @logging('committing document...')
   def __commit_document(self) -> None:
-    raw_document_content = fm.read_pdf(self.path)
+    raw_document_content = fm.read_file(self.src_path)
     normalized_document_content = normalize_text(raw_document_content)
 
     fm.write_to_file(path=DOCUMENT_PATH, content=normalized_document_content)
@@ -233,7 +288,7 @@ class Parser:
     self.qa_client = BertQaModelClient(context=self.document)
 
   @logging('processing with UDPipe, mapping to sentences...')
-  def __process_with_udp(self) -> None:  # noqa
+  def __process_with_udp(self) -> None:
     uc.process(src_path=DOCUMENT_PATH, dst_path=PROCESSED_DOCUMENT_PATH, locally=False)
 
     processed_document = fm.read_json(path=PROCESSED_DOCUMENT_PATH)
