@@ -140,7 +140,7 @@ def build_cloud(
 def evaluate() -> TfIdf:
   records = fm.bulk_get_files_records(STATS_PAIRS_DATA_DIR_PATH, '*.txt')
 
-  tf_unigrams = fm.read_file(STATS_COMMON_DATA_DIR_PATH)
+  tf_unigrams = fm.read_txt(STATS_COMMON_DATA_DIR_PATH)
   idf_unigrams = map_records_content_list(records)
   tf_bigrams = parse_list_to_bigrams(tf_unigrams.split('\n'))
   idf_bigrams = parse_list_to_bigrams(idf_unigrams)

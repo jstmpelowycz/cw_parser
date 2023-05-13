@@ -10,6 +10,7 @@ from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
 from pdfminer.pdfpage import PDFPage
 
+from src.modules.file_manager.constants import PDF_FILE_MARKER, TXT_FILE_MARKER
 from src.modules.file_manager.typedefs import IdentifiablePath, IdentifiableJSON, IdentifiableFileRecord
 
 
@@ -70,6 +71,15 @@ def read_json(path: str) -> dict or None:
 
 
 def read_file(path: str) -> str:
+  if PDF_FILE_MARKER in path:
+    return read_pdf(path)
+  elif TXT_FILE_MARKER in path:
+    return read_txt(path)
+  else:
+    throw('file format is not acceptable!')
+
+
+def read_txt(path: str) -> str:
   try:
     with open(path, 'r', encoding='utf-8') as file:
       lines = file.readlines()
@@ -136,7 +146,7 @@ def bulk_get_files_records(
     records.append(
       IdentifiableFileRecord(
         id=get_file_id(path),
-        content=read_file(path)
+        content=read_txt(path)
       )
     )
 

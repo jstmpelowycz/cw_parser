@@ -1,0 +1,2 @@
+PDF_FILE_MARKER = '.pdf'
+TXT_FILE_MARKER = '.txt'
