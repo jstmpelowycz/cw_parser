@@ -13,6 +13,7 @@ from src.modules.regexs.constants import \
 def define_date_pattern(value: str) -> Pattern[str]:
   if does_month_marker_occur(value):
     return make_date_labeled_pattern()
+
   return make_date_digital_pattern()
 
 
@@ -29,7 +30,7 @@ def make_date_labeled_pattern() -> Pattern[str]:
 
 
 def make_date_digital_pattern() -> Pattern[str]:
-  return re.compile(r'(\d{2}).(\d{2}).(\d{4})')
+  return re.compile(r'(\d{2})\.(\d{2})\.(\d{4})')
 
 
 def make_case_header_pattern() -> Pattern[str]:
