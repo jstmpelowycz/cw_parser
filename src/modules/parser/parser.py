@@ -5,13 +5,13 @@ from typing import Optional, Pattern, Match
 import src.modules.file_manager.file_manager as fm
 import src.modules.udpipe_client.udpipe_client as uc
 import src.modules.udpipe_client.helpers as uch
-import src.modules.parser.regexs.helpers as reh
+import src.modules.regexs.helpers as reh
 
-from src.modules.parser.bert_qa.bert_qa import BertQaModelClient
+from src.modules.bert_qa.bert_qa import BertQaModelClient
 from src.modules.parser.decorators import WithSectionContext
 from src.modules.parser.helpers import logging, normalize_text
 
-from src.modules.parser.regexs.constants import \
+from src.modules.regexs.constants import \
   REG_FRAMEWORK_PATTERN, \
   CASE_FORM_MARKERS, \
   UDP_GENDER_PATTERN, \
@@ -137,7 +137,7 @@ class Parser:
     case_parties_with_assumed_genders = self.__assume_case_parties_genders(count)
 
     for party_name, assumed_genders in case_parties_with_assumed_genders.items():
-      sex = Parser.__defined_major_sex(assumed_genders)
+      sex = Parser.defined_major_sex(sexes=assumed_genders)
 
       case_parties.append(CaseParty(name=party_name, sex=sex))
 
@@ -166,9 +166,9 @@ class Parser:
     return case_parties_with_assumed_genders
 
   @staticmethod
-  def __defined_major_sex(assumed_genders: list[str]) -> Optional[str]:
-    masc_count = assumed_genders.count(SEX['M'])
-    fem_count = assumed_genders.count(SEX['F'])
+  def defined_major_sex(sexes: list[str]) -> Optional[str]:
+    masc_count = sexes.count(SEX['M'])
+    fem_count = sexes.count(SEX['F'])
 
     if masc_count > fem_count:
       sex = SEX['M']

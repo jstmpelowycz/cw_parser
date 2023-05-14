@@ -1,6 +1,6 @@
 from src.utils.decorators import make_logging_decorator
 
-from src.modules.parser.regexs.constants import \
+from src.modules.regexs.constants import \
   NBSP_PATTERN, \
   FF_PATTERN, \
   HTTP_PATTERN, \

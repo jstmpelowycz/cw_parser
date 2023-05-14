@@ -3,8 +3,8 @@ from typing import Optional
 
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
 
-from src.modules.parser.bert_qa.constants import QA_MODEL_NAME, PIPELINE_TASK_TYPE, CACHE_DIR_PATH
-from src.modules.parser.bert_qa.helpers import thresholded, normalize_answer
+from src.modules.bert_qa.constants import QA_MODEL_NAME, PIPELINE_TASK_TYPE, CACHE_DIR_PATH
+from src.modules.bert_qa.helpers import thresholded, normalize_answer
 
 
 class BertQaModelClient:

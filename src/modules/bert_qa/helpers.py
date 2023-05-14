@@ -1,6 +1,6 @@
 from typing import Optional
 
-from src.modules.parser.bert_qa.constants import ANSWER_SCORE_THRESH
+from src.modules.bert_qa.constants import ANSWER_SCORE_THRESH
 
 
 def thresholded(output: dict) -> Optional[str]:
