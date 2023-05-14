@@ -46,8 +46,6 @@ class ParserEfficiencyAnalyzer:
     plt.tight_layout()
     plt.savefig(PARSER_EFF_FILE)
 
-    plt.show()
-
   def __eval_eff_results(self) -> None:
     document_header_section_eff, \
     document_ruling_section_eff, \
