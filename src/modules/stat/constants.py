@@ -10,4 +10,4 @@ UGIDF_CLOUD_FILE = f'{STATS_CHARTS_DIR_PATH}/ugidf_cloud.jpg'
 UGTF_BARH_FILE = f'{STATS_CHARTS_DIR_PATH}/ugtf_barh.jpg'
 UGIDF_BARH_FILE = f'{STATS_CHARTS_DIR_PATH}/ugidf_barh.jpg'
 BGTF_BARH_FILE = f'{STATS_CHARTS_DIR_PATH}/bgtf_barh.jpg'
-BGIDF_BARH_FILE = f'{STATS_CHARTS_DIR_PATH}/bgidf_barh.jpg'
+
