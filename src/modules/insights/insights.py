@@ -79,7 +79,7 @@ class Insights:
     plt.xlabel("Weekdays")
     plt.ylabel("Occurrences")
     plt.title("Productivity by Weekday")
-    plt.xticks(x_values, WEEKDAYS, rotation=45)
+    plt.xticks(x_values, WEEKDAYS, rotation=45, ha='right')
     plt.tight_layout()
     plt.savefig(PRODUCT_INSIGHT_FILE)
 
@@ -94,10 +94,11 @@ class Insights:
     article_names = [article[0] for article in most_common_freqs]
     freqs = [article[1] for article in most_common_freqs]
 
+    plt.figure(figsize=(10, 10))
     plt.bar(article_names, freqs)
     plt.xlabel("Article")
     plt.ylabel("Frequency")
     plt.title("Most Frequent Articles")
-    plt.xticks(rotation=90)
-    plt.tight_layout(pad=50)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout(h_pad=100)
     plt.savefig(TOP_ARTICLES_INSIGHT_FILE)
