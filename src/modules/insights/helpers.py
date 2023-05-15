@@ -53,8 +53,8 @@ def eval_top_strings_freqs(strings: list[str]):
     log(f'{matches}')
 
     for match in matches:
-      strings_freqs.setdefault(match, 0)
-      strings_freqs[match] += 1
+      strings_freqs.setdefault(match[0], 0)
+      strings_freqs[match[0]] += 1
 
   most_common_strings = sorted(
     strings_freqs.items(),
