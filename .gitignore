@@ -2,6 +2,7 @@
 cache
 data
 src/modules/parser/__local__
+src/modules/data_collector/constants.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
